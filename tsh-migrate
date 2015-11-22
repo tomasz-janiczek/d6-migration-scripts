@@ -1,0 +1,25 @@
+#!/bin/sh
+
+rm -rf sites/all/modules/oauth
+
+patch -i ../narko.patch sites/all/themes/narkopolityka/template.php
+
+drush -y pm-refresh
+drush -y dl oauth emfield
+drush -y dl jquery_update-6.x-2.x-dev
+drush -y en jquery_update
+
+#drush sql-query "UPDATE variable SET value='s:3:\"1.7\";' WHERE name='jquery_update_jquery_version'"
+drush sql-query "INSERT INTO variable (name,value) VALUES ('jquery_update_jquery_version','s:3:\"1.7\";')"
+
+drush pml --no-core --type=module --status=enabled --pipe > modules.txt
+cat modules.txt | xargs drush -y dis #since you can batch uninstall no problems
+drush -y pm-update > tsh-migrate-core.log 2>&1
+cat modules.txt | xargs -L 1 drush -y en #may choke without the "one line at a time" command
+drush -y pm-update > tsh-migrate-modules.log 2>&1
+
+drush pml --no-core --type=module --status=enabled --pipe > modules.new.txt
+drush sql-query "UPDATE variable SET value='b:1;' WHERE name='jquery_update_replace'"
+
+diff modules.txt modules.new.txt
+
